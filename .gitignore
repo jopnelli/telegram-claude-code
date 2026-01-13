@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Sessions
+data/sessions/*.json
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Bun
+bun.lockb
