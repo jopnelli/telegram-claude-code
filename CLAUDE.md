@@ -1,71 +1,58 @@
-# Telegram Claude Code Bot
+# Telegram Claude Code
 
-A Telegram bot that provides a conversational interface to Claude Code.
+Telegram bot that spawns the Claude CLI for each message.
 
 ## Architecture
 
 ```
-Telegram -> grammy bot -> Claude Agent SDK -> Claude Opus 4.5
-                |                                   |
-         Streaming updates              File ops, bash, web search
+Telegram message
+    -> grammy bot receives it
+    -> Bun.spawn("claude", ["-p", message, "--output-format", "stream-json", "--verbose", "--resume", sessionId])
+    -> Parse JSON stream, update Telegram message
+    -> Save session ID for next message
 ```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/index.ts` | Entry point, bot setup, middleware |
-| `src/config.ts` | Environment variables, paths, limits |
-| `src/session.ts` | Claude session persistence |
-| `src/security.ts` | User auth, path validation, audit log |
-| `src/streaming.ts` | Throttled Telegram message updates |
-| `src/handlers/text.ts` | Main message handler with Claude SDK |
+| `src/index.ts` | Bot setup, middleware, handlers |
+| `src/handlers/text.ts` | Main handler - spawns Claude CLI |
 | `src/handlers/commands.ts` | /new, /stop, /status, /resume |
-| `src/handlers/photo.ts` | Image message handling |
+| `src/session.ts` | Session ID persistence |
+| `src/streaming.ts` | Throttled Telegram message updates |
+| `src/security.ts` | User allowlist, audit logging |
+| `src/config.ts` | Environment variables |
 
-## Key Concepts
+## CLI Integration
 
-### Session Management
-- Sessions are Claude Agent SDK session IDs
-- Stored in `data/sessions/{userId}.json`
-- Allows conversation continuity across messages
-- `/new` clears session, `/resume` restores it
+Each message runs:
+```bash
+claude -p "message" --output-format stream-json --verbose --resume <session_id>
+```
 
-### Streaming
-- Uses `StreamingState` class for throttled updates
-- Updates Telegram message every 300ms max
-- Shows tool usage with emojis (📖 Read, 💻 Bash, etc.)
-- Truncates to Telegram's 4096 char limit
+The `stream-json` output provides events:
+- `system` - Session init with session_id
+- `assistant` - Text and tool_use blocks
+- `user` - Tool results
+- `result` - Final response
 
-### Security
-- User allowlist via `TELEGRAM_ALLOWED_USERS`
-- Path validation via `ALLOWED_PATHS`
-- All interactions logged to audit file
+## Session Management
 
-## Dependencies
+- Session IDs stored in `data/sessions/{userId}.json`
+- `--resume` flag continues conversation
+- `/new` clears session for fresh start
 
-- `grammy` - Telegram bot framework
-- `@grammyjs/runner` - Concurrency with sequentialize
-- `@grammyjs/auto-retry` - Rate limit handling
-- `@anthropic-ai/claude-agent-sdk` - Claude Code integration
+## Streaming
+
+- Parse JSON lines from Claude stdout
+- Show tool calls: `[Bash: ls -la]`
+- Update Telegram message every 300ms (throttled)
+- Truncate to 4096 chars (Telegram limit)
 
 ## Commands
 
 ```bash
-# Development
-bun run dev
-
-# Production
-bun run start
-
-# Service management
-sudo systemctl status telegram-claude-code
-sudo journalctl -u telegram-claude-code -f
+bun run start      # Production
+bun run dev        # Development with watch
 ```
-
-## Conventions
-
-- TypeScript with strict mode
-- ES modules (`"type": "module"`)
-- Async/await for all I/O
-- Error handling with try/catch and audit logging
