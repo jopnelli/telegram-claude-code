@@ -1,30 +1,16 @@
 /**
- * Text message handler - main Claude interaction with proper streaming
+ * Text message handler - spawns actual Claude Code CLI
  */
 
 import type { Context } from "grammy";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { spawn } from "child_process";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { CLAUDE_MODEL, WORKING_DIR } from "../config";
-
-// Tool name to emoji mapping
-const TOOL_EMOJI: Record<string, string> = {
-  Read: "📖",
-  Write: "✍️",
-  Edit: "✏️",
-  Bash: "💻",
-  Glob: "🔍",
-  Grep: "🔎",
-  WebFetch: "🌐",
-  WebSearch: "🔍",
-  TodoWrite: "📝",
-  Task: "🤖",
-};
+import { WORKING_DIR } from "../config";
 
 /**
- * Handle incoming text messages
+ * Handle incoming text messages by spawning Claude CLI
  */
 export async function handleText(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -53,7 +39,7 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // Check if already processing
   if (session.isProcessing) {
-    await ctx.reply("Still processing previous message. Use /stop to cancel or ! to interrupt.");
+    await ctx.reply("Still processing. Use /stop to cancel or ! to interrupt.");
     return;
   }
 
@@ -66,130 +52,134 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // Set up for processing
   session.isProcessing = true;
-  session.abortController = new AbortController();
-
   const streaming = new StreamingState(ctx.api, chatId);
   
-  // State for building the display
-  let currentTool = "";
-  let responseText = "";
-  let thinkingText = "";
-  let newSessionId: string | null = null;
+  // Build CLI arguments
+  const args = [
+    "-p", text,
+    "--output-format", "stream-json",
+    "--verbose",
+  ];
+  
+  // Resume session if we have one
+  if (session.sessionId) {
+    args.push("--resume", session.sessionId);
+  }
 
-  // Helper to build the display message
-  const buildDisplay = (): string => {
-    let display = "";
-    
-    // Show current tool action
-    if (currentTool) {
-      display += currentTool + "\n\n";
-    }
-    
-    // Show thinking (truncated)
-    if (thinkingText) {
-      const truncatedThinking = thinkingText.length > 200 
-        ? "..." + thinkingText.slice(-200) 
-        : thinkingText;
-      display += `🧠 _${truncatedThinking}_\n\n`;
-    }
-    
-    // Show response
-    if (responseText) {
-      display += responseText;
-    }
-    
-    return display || "Processing...";
-  };
+  let currentDisplay = "";
+  let lastToolUse = "";
+  let responseText = "";
+  let newSessionId: string | null = null;
+  let childProcess: ReturnType<typeof spawn> | null = null;
 
   try {
-    // Build the query options
-    const options: any = {
-      model: CLAUDE_MODEL,
-      cwd: WORKING_DIR,
-      permissionMode: "bypassPermissions",
-      allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"],
-    };
+    await new Promise<void>((resolve, reject) => {
+      // Spawn claude CLI
+      childProcess = spawn("claude", args, {
+        cwd: WORKING_DIR,
+        env: { ...process.env, FORCE_COLOR: "0" },
+      });
 
-    // Resume existing session if we have one
-    if (session.sessionId) {
-      options.resume = session.sessionId;
-    }
+      // Store for abort
+      session.abortController = {
+        abort: () => {
+          if (childProcess) {
+            childProcess.kill("SIGTERM");
+          }
+        },
+      } as AbortController;
 
-    // Run the query with streaming
-    const response = query({
-      prompt: text,
-      options,
-      abortController: session.abortController,
+      let buffer = "";
+
+      childProcess.stdout?.on("data", async (data: Buffer) => {
+        buffer += data.toString();
+        
+        // Process complete JSON lines
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          try {
+            const event = JSON.parse(line);
+            
+            // Capture session ID
+            if (event.type === "system" && event.session_id) {
+              newSessionId = event.session_id;
+            }
+            
+            // Handle different event types
+            if (event.type === "assistant" && event.message?.content) {
+              for (const block of event.message.content) {
+                if (block.type === "text") {
+                  responseText = block.text;
+                  currentDisplay = responseText;
+                  await streaming.update(currentDisplay);
+                }
+                if (block.type === "tool_use") {
+                  const toolName = block.name || "tool";
+                  let toolInfo = toolName;
+                  
+                  // Add details for common tools
+                  if (block.input?.file_path) {
+                    toolInfo += `: ${block.input.file_path}`;
+                  } else if (block.input?.command) {
+                    toolInfo += `: ${block.input.command.slice(0, 40)}`;
+                  } else if (block.input?.pattern) {
+                    toolInfo += `: ${block.input.pattern}`;
+                  } else if (block.input?.query) {
+                    toolInfo += `: ${block.input.query}`;
+                  }
+                  
+                  lastToolUse = `[${toolInfo}]\n`;
+                  currentDisplay = lastToolUse + responseText;
+                  await streaming.update(currentDisplay);
+                }
+              }
+            }
+            
+            // Handle content_block_delta for streaming text
+            if (event.type === "content_block_delta" && event.delta?.text) {
+              responseText += event.delta.text;
+              currentDisplay = lastToolUse + responseText;
+              await streaming.update(currentDisplay);
+            }
+            
+            // Handle result
+            if (event.type === "result") {
+              if (event.result) {
+                responseText = event.result;
+                currentDisplay = responseText;
+                await streaming.update(currentDisplay);
+              }
+              if (event.session_id) {
+                newSessionId = event.session_id;
+              }
+            }
+            
+          } catch (e) {
+            // Not valid JSON, ignore
+          }
+        }
+      });
+
+      childProcess.stderr?.on("data", (data: Buffer) => {
+        console.error("Claude stderr:", data.toString());
+      });
+
+      childProcess.on("close", (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Claude exited with code ${code}`));
+        }
+      });
+
+      childProcess.on("error", (err) => {
+        reject(err);
+      });
     });
-
-    for await (const message of response) {
-      // Capture session ID
-      if (message.type === "system" && message.subtype === "init") {
-        newSessionId = message.session_id;
-      }
-
-      // Handle tool use start
-      if (message.type === "tool_use") {
-        const toolName = message.name || "Unknown";
-        const emoji = TOOL_EMOJI[toolName] || "🔧";
-        
-        // Build tool description
-        let toolDesc = `${emoji} Using ${toolName}`;
-        
-        // Add relevant details based on tool type
-        if (message.input) {
-          if (toolName === "Read" && message.input.file_path) {
-            toolDesc += `: ${message.input.file_path}`;
-          } else if (toolName === "Bash" && message.input.command) {
-            const cmd = message.input.command.slice(0, 50);
-            toolDesc += `: \`${cmd}${message.input.command.length > 50 ? "..." : ""}\``;
-          } else if (toolName === "Glob" && message.input.pattern) {
-            toolDesc += `: ${message.input.pattern}`;
-          } else if (toolName === "Grep" && message.input.pattern) {
-            toolDesc += `: ${message.input.pattern}`;
-          } else if (toolName === "WebSearch" && message.input.query) {
-            toolDesc += `: "${message.input.query}"`;
-          }
-        }
-        
-        currentTool = toolDesc;
-        await streaming.update(buildDisplay());
-      }
-
-      // Handle tool result (clear the tool indicator)
-      if (message.type === "tool_result") {
-        currentTool = "";
-        await streaming.update(buildDisplay());
-      }
-
-      // Handle thinking
-      if (message.type === "thinking") {
-        thinkingText = message.thinking || "";
-        await streaming.update(buildDisplay());
-      }
-
-      // Handle assistant messages (text content)
-      if (message.type === "assistant") {
-        for (const block of message.message.content) {
-          if (block.type === "text") {
-            responseText += block.text;
-            currentTool = ""; // Clear tool when we get text
-            thinkingText = ""; // Clear thinking when we get response
-            await streaming.update(buildDisplay());
-          }
-        }
-      }
-
-      // Handle final result
-      if (message.type === "result" && message.subtype === "success") {
-        if (message.result) {
-          responseText = message.result;
-          currentTool = "";
-          thinkingText = "";
-          await streaming.update(buildDisplay());
-        }
-      }
-    }
 
     // Finalize the message
     await streaming.finalize();
@@ -206,11 +196,11 @@ export async function handleText(ctx: Context): Promise<void> {
     });
 
   } catch (err: any) {
-    if (err.name === "AbortError" || err.message?.includes("aborted")) {
-      await ctx.reply("Query stopped.");
+    if (err.message?.includes("SIGTERM") || err.message?.includes("killed")) {
+      await ctx.reply("Stopped.");
       auditLog({ userId: userId!, action: "aborted", details: "" });
     } else {
-      console.error("Query error:", err);
+      console.error("Claude error:", err);
       await ctx.reply(`Error: ${err.message || "Unknown error"}`);
       auditLog({ userId: userId!, action: "error", details: err.message || "unknown" });
     }
