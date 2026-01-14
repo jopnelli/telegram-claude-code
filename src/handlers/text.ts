@@ -6,7 +6,23 @@ import type { Context } from "grammy";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS } from "../config";
+
+/**
+ * Minimal environment for Claude CLI subprocess
+ * Only includes what's necessary - no API keys or sensitive data
+ */
+function getClaudeEnv(): Record<string, string> {
+  return {
+    PATH: process.env.PATH || "/usr/bin:/bin:/usr/local/bin",
+    HOME: process.env.HOME || "",
+    USER: process.env.USER || "",
+    SHELL: process.env.SHELL || "/bin/sh",
+    TERM: "dumb",
+    FORCE_COLOR: "0",
+    // Claude CLI uses its own OAuth, not API keys
+  };
+}
 
 /**
  * Handle incoming text messages by spawning Claude CLI
@@ -56,7 +72,12 @@ export async function handleText(ctx: Context): Promise<void> {
 
   // Build CLI arguments
   const args = ["-p", text, "--output-format", "stream-json", "--verbose"];
-  
+
+  // Add allowed directories for file access
+  for (const allowedPath of ALLOWED_PATHS) {
+    args.push("--add-dir", allowedPath);
+  }
+
   if (session.sessionId) {
     args.push("--resume", session.sessionId);
   }
@@ -64,16 +85,24 @@ export async function handleText(ctx: Context): Promise<void> {
   let responseText = "";
   let currentTool = "";
   let newSessionId: string | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   try {
     console.log("Spawning claude with args:", args.join(" "));
-    
+
     const proc = Bun.spawn(["claude", ...args], {
       cwd: WORKING_DIR,
-      env: { ...process.env, FORCE_COLOR: "0" },
+      env: getClaudeEnv(),
       stdout: "pipe",
       stderr: "pipe",
     });
+
+    // Set up timeout to kill runaway processes
+    timeoutId = setTimeout(() => {
+      console.log(`Claude process timed out after ${CLAUDE_TIMEOUT_MS}ms`);
+      proc.kill();
+      auditLog({ userId: userId!, action: "timeout", details: `Killed after ${CLAUDE_TIMEOUT_MS}ms` });
+    }, CLAUDE_TIMEOUT_MS);
 
     const reader = proc.stdout.getReader();
     const decoder = new TextDecoder();
@@ -92,7 +121,7 @@ export async function handleText(ctx: Context): Promise<void> {
 
         try {
           const event = JSON.parse(line);
-          
+
           // Capture session ID
           if (event.session_id && !newSessionId) {
             newSessionId = event.session_id;
@@ -112,7 +141,7 @@ export async function handleText(ctx: Context): Promise<void> {
                 else if (block.input?.command) detail = block.input.command.slice(0, 40);
                 else if (block.input?.pattern) detail = block.input.pattern;
                 else if (block.input?.query) detail = block.input.query;
-                
+
                 currentTool = detail ? `[${toolName}: ${detail}]\n` : `[${toolName}]\n`;
                 await streaming.update(currentTool + responseText);
               }
@@ -165,6 +194,7 @@ export async function handleText(ctx: Context): Promise<void> {
     await ctx.reply(`Error: ${err.message || "Unknown error"}`);
     auditLog({ userId: userId!, action: "error", details: err.message || "unknown" });
   } finally {
+    if (timeoutId) clearTimeout(timeoutId);
     clearInterval(typingInterval);
     session.isProcessing = false;
     session.currentMessageId = streaming.getMessageId();

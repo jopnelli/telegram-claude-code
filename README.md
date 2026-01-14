@@ -72,6 +72,27 @@ This gives you:
 - Session continuity via `--resume`
 - Streaming output parsed and sent to Telegram
 
+## Security
+
+This bot includes several security measures:
+
+- **User allowlist** - Only authorized Telegram user IDs can interact with the bot
+- **Minimal environment** - Subprocess runs with only essential env vars (no API keys leaked)
+- **Path restrictions** - Uses `--add-dir` to limit Claude's file access
+- **Subprocess timeout** - Kills runaway processes after configurable timeout (default: 5 min)
+- **Audit logging** - All actions logged to file for review
+- **Random temp files** - Photo temp files use UUIDs to prevent prediction attacks
+
+### Recommended: Safety Net Plugin
+
+For additional protection against destructive commands (`rm -rf`, `git reset --hard`, etc.), install the [claude-code-safety-net](https://github.com/kenryu42/claude-code-safety-net) plugin:
+
+```bash
+claude plugin add kenryu42/claude-code-safety-net
+```
+
+This blocks dangerous operations before they execute, regardless of prompt.
+
 ## Deployment (systemd)
 
 ```ini

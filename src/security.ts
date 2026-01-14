@@ -1,10 +1,13 @@
 /**
- * Security module - user allowlist, path validation, audit logging
+ * Security module - user allowlist and audit logging
+ *
+ * Note: Path restrictions are enforced via Claude CLI's --add-dir flag.
+ * For additional protection against dangerous commands, consider installing
+ * the claude-code-safety-net plugin: https://github.com/kenryu42/claude-code-safety-net
  */
 
-import { resolve, normalize } from "path";
-import { appendFileSync, realpathSync } from "fs";
-import { ALLOWED_USERS, ALLOWED_PATHS, AUDIT_LOG } from "./config";
+import { appendFileSync } from "fs";
+import { ALLOWED_USERS, AUDIT_LOG } from "./config";
 import type { AuditEntry } from "./types";
 
 /**
@@ -13,40 +16,6 @@ import type { AuditEntry } from "./types";
 export function isAuthorized(userId: number | undefined): boolean {
   if (!userId) return false;
   return ALLOWED_USERS.includes(userId);
-}
-
-/**
- * Check if a file path is allowed for Claude to access
- */
-export function isPathAllowed(targetPath: string): boolean {
-  try {
-    // Expand ~ and normalize
-    const expanded = targetPath.replace(/^~/, process.env.HOME || "");
-    const normalized = normalize(expanded);
-
-    // Try to resolve symlinks
-    let resolved: string;
-    try {
-      resolved = realpathSync(normalized);
-    } catch {
-      resolved = resolve(normalized);
-    }
-
-    // Check against allowed paths
-    for (const allowed of ALLOWED_PATHS) {
-      const allowedResolved = resolve(allowed);
-      if (
-        resolved === allowedResolved ||
-        resolved.startsWith(allowedResolved + "/")
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
 }
 
 /**

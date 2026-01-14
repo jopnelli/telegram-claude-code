@@ -1,6 +1,6 @@
 /**
  * Photo message handler - spawns Claude CLI with image
- * 
+ *
  * Note: Claude CLI doesnt support images directly via -p flag.
  * For now, save image to temp file and tell Claude to look at it.
  * TODO: Implement proper vision support
@@ -8,10 +8,25 @@
 
 import type { Context } from "grammy";
 import { writeFileSync, unlinkSync } from "fs";
+import { randomUUID } from "crypto";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN } from "../config";
+
+/**
+ * Minimal environment for Claude CLI subprocess
+ */
+function getClaudeEnv(): Record<string, string> {
+  return {
+    PATH: process.env.PATH || "/usr/bin:/bin:/usr/local/bin",
+    HOME: process.env.HOME || "",
+    USER: process.env.USER || "",
+    SHELL: process.env.SHELL || "/bin/sh",
+    TERM: "dumb",
+    FORCE_COLOR: "0",
+  };
+}
 
 export async function handlePhoto(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
@@ -48,21 +63,30 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   session.isProcessing = true;
   const streaming = new StreamingState(ctx.api, chatId);
 
+  let tempPath: string | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
   try {
     // Download image
     const file = await ctx.api.getFile(photo.file_id);
-    const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+    const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${file.file_path}`;
     const response = await fetch(fileUrl);
     const buffer = await response.arrayBuffer();
-    
-    // Save to temp file
-    const tempPath = `/tmp/telegram-photo-${userId}-${Date.now()}.jpg`;
+
+    // Save to temp file with random name to prevent prediction attacks
+    tempPath = `/tmp/telegram-photo-${randomUUID()}.jpg`;
     writeFileSync(tempPath, Buffer.from(buffer));
 
     // Build prompt that references the image
     const prompt = `I have saved an image to ${tempPath}. Please look at it and answer: ${caption}`;
 
     const args = ["-p", prompt, "--output-format", "stream-json", "--verbose"];
+
+    // Add allowed directories for file access
+    for (const allowedPath of ALLOWED_PATHS) {
+      args.push("--add-dir", allowedPath);
+    }
+
     if (session.sessionId) {
       args.push("--resume", session.sessionId);
     }
@@ -73,10 +97,17 @@ export async function handlePhoto(ctx: Context): Promise<void> {
 
     const proc = Bun.spawn(["claude", ...args], {
       cwd: WORKING_DIR,
-      env: { ...process.env, FORCE_COLOR: "0" },
+      env: getClaudeEnv(),
       stdout: "pipe",
       stderr: "pipe",
     });
+
+    // Set up timeout to kill runaway processes
+    timeoutId = setTimeout(() => {
+      console.log(`Claude process timed out after ${CLAUDE_TIMEOUT_MS}ms`);
+      proc.kill();
+      auditLog({ userId: userId!, action: "timeout", details: `Killed after ${CLAUDE_TIMEOUT_MS}ms` });
+    }, CLAUDE_TIMEOUT_MS);
 
     const reader = proc.stdout.getReader();
     const decoder = new TextDecoder();
@@ -94,7 +125,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
         if (!line.trim()) continue;
         try {
           const event = JSON.parse(line);
-          
+
           if (event.session_id && !newSessionId) {
             newSessionId = event.session_id;
           }
@@ -129,9 +160,6 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     await proc.exited;
     await streaming.finalize();
 
-    // Cleanup temp file
-    try { unlinkSync(tempPath); } catch {}
-
     if (newSessionId) {
       setSessionId(userId!, newSessionId);
     }
@@ -145,7 +173,13 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   } catch (err: any) {
     console.error("Photo error:", err);
     await ctx.reply(`Error: ${err.message}`);
+    auditLog({ userId: userId!, action: "error", details: err.message || "unknown" });
   } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    // Cleanup temp file
+    if (tempPath) {
+      try { unlinkSync(tempPath); } catch {}
+    }
     session.isProcessing = false;
     persistSession(userId!, session);
   }
