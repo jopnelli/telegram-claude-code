@@ -6,7 +6,14 @@ import type { Context } from "grammy";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, getDisallowedTools } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, DISALLOWED_TOOLS } from "../config";
+
+/**
+ * Get disallowed tools for CLI flag
+ */
+function getDisallowedTools(): string[] {
+  return DISALLOWED_TOOLS;
+}
 
 /**
  * Minimal environment for Claude CLI subprocess

@@ -27,61 +27,30 @@ export const ALLOWED_PATHS: string[] = (process.env.ALLOWED_PATHS || "")
 // Subprocess timeout (default: 5 minutes)
 export const CLAUDE_TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || "300000");
 
-// Safety mode: "off", "standard", "paranoid"
-// - off: no restrictions
-// - standard: block destructive commands (rm -rf, git reset --hard, etc.)
-// - paranoid: standard + block interpreter one-liners
-export const SAFETY_MODE = (process.env.SAFETY_MODE || "standard") as "off" | "standard" | "paranoid";
-
 /**
- * Dangerous command patterns to block via --disallowed-tools
+ * Dangerous command patterns blocked via --disallowed-tools
  * Based on claude-code-safety-net patterns
- * Syntax: Bash(pattern:*) where pattern uses glob matching
+ * Syntax: Bash(command:*) matches commands starting with that prefix
  */
-export const DANGEROUS_PATTERNS = {
-  standard: [
-    // Destructive file operations
-    "Bash(rm -rf:*)",
-    "Bash(rm -fr:*)",
-    // Destructive git operations
-    "Bash(git reset --hard:*)",
-    "Bash(git reset --merge:*)",
-    "Bash(git clean -f:*)",
-    "Bash(git clean -fd:*)",
-    "Bash(git clean -fx:*)",
-    "Bash(git push --force:*)",    // use --force-with-lease instead
-    "Bash(git push -f:*)",
-    "Bash(git branch -D:*)",
-    "Bash(git stash drop:*)",
-    "Bash(git stash clear:*)",
-    "Bash(git checkout -- :*)",    // file restoration
-    // Destructive find operations
-    "Bash(find*-delete:*)",
-  ],
-  paranoid: [
-    // All standard patterns plus interpreter restrictions
-    "Bash(python -c:*)",
-    "Bash(python3 -c:*)",
-    "Bash(node -e:*)",
-    "Bash(ruby -e:*)",
-    "Bash(perl -e:*)",
-    "Bash(sh -c:*)",
-    "Bash(bash -c:*)",
-  ],
-};
-
-/**
- * Get the list of disallowed tool patterns based on safety mode
- */
-export function getDisallowedTools(): string[] {
-  if (SAFETY_MODE === "off") return [];
-
-  const patterns = [...DANGEROUS_PATTERNS.standard];
-  if (SAFETY_MODE === "paranoid") {
-    patterns.push(...DANGEROUS_PATTERNS.paranoid);
-  }
-  return patterns;
-}
+export const DISALLOWED_TOOLS = [
+  // Destructive file operations
+  "Bash(rm -rf:*)",
+  "Bash(rm -fr:*)",
+  // Destructive git operations
+  "Bash(git reset --hard:*)",
+  "Bash(git reset --merge:*)",
+  "Bash(git clean -f:*)",
+  "Bash(git clean -fd:*)",
+  "Bash(git clean -fx:*)",
+  "Bash(git push --force:*)",  // use --force-with-lease instead
+  "Bash(git push -f:*)",
+  "Bash(git branch -D:*)",
+  "Bash(git stash drop:*)",
+  "Bash(git stash clear:*)",
+  "Bash(git checkout -- :*)",  // file restoration
+  // Destructive find operations
+  "Bash(find*-delete:*)",
+];
 
 // Telegram limits
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
@@ -108,4 +77,4 @@ console.log(`  Working dir: ${WORKING_DIR}`);
 console.log(`  Allowed users: ${ALLOWED_USERS.length}`);
 console.log(`  Allowed paths: ${ALLOWED_PATHS.length}`);
 console.log(`  Timeout: ${CLAUDE_TIMEOUT_MS}ms`);
-console.log(`  Safety mode: ${SAFETY_MODE}`);
+console.log(`  Blocked patterns: ${DISALLOWED_TOOLS.length}`);

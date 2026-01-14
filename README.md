@@ -84,17 +84,10 @@ This bot includes several security measures:
 - **Random temp files** - Photo temp files use UUIDs to prevent prediction attacks
 - **Command safety** - Blocks destructive commands via `--disallowed-tools`
 
-### Safety Mode
+### Command Safety
 
-Set `SAFETY_MODE` in your `.env` to control command restrictions:
+Destructive commands are blocked by default via `--disallowed-tools`:
 
-| Mode | Description |
-|------|-------------|
-| `off` | No restrictions (full Claude Code access) |
-| `standard` | **Default.** Blocks destructive commands |
-| `paranoid` | Standard + blocks interpreter one-liners |
-
-**Commands blocked in `standard` mode:**
 - `rm -rf`, `rm -fr` (recursive forced deletion)
 - `git reset --hard`, `git reset --merge`
 - `git clean -f`, `git clean -fd`, `git clean -fx`
@@ -103,11 +96,6 @@ Set `SAFETY_MODE` in your `.env` to control command restrictions:
 - `git stash drop`, `git stash clear`
 - `git checkout --` (file restoration)
 - `find -delete`
-
-**Additional blocks in `paranoid` mode:**
-- `python -c`, `python3 -c`
-- `node -e`, `ruby -e`, `perl -e`
-- `sh -c`, `bash -c`
 
 Based on patterns from [claude-code-safety-net](https://github.com/kenryu42/claude-code-safety-net).
 
