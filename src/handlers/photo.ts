@@ -12,7 +12,7 @@ import { randomUUID } from "crypto";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN, getDisallowedTools } from "../config";
 
 /**
  * Minimal environment for Claude CLI subprocess
@@ -85,6 +85,12 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     // Add allowed directories for file access
     for (const allowedPath of ALLOWED_PATHS) {
       args.push("--add-dir", allowedPath);
+    }
+
+    // Add safety restrictions (block dangerous commands)
+    const disallowed = getDisallowedTools();
+    if (disallowed.length > 0) {
+      args.push("--disallowed-tools", disallowed.join(" "));
     }
 
     if (session.sessionId) {

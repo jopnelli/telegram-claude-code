@@ -82,16 +82,34 @@ This bot includes several security measures:
 - **Subprocess timeout** - Kills runaway processes after configurable timeout (default: 5 min)
 - **Audit logging** - All actions logged to file for review
 - **Random temp files** - Photo temp files use UUIDs to prevent prediction attacks
+- **Command safety** - Blocks destructive commands via `--disallowed-tools`
 
-### Recommended: Safety Net Plugin
+### Safety Mode
 
-For additional protection against destructive commands (`rm -rf`, `git reset --hard`, etc.), install the [claude-code-safety-net](https://github.com/kenryu42/claude-code-safety-net) plugin:
+Set `SAFETY_MODE` in your `.env` to control command restrictions:
 
-```bash
-claude plugin add kenryu42/claude-code-safety-net
-```
+| Mode | Description |
+|------|-------------|
+| `off` | No restrictions (full Claude Code access) |
+| `standard` | **Default.** Blocks destructive commands |
+| `paranoid` | Standard + blocks interpreter one-liners |
 
-This blocks dangerous operations before they execute, regardless of prompt.
+**Commands blocked in `standard` mode:**
+- `rm -rf`, `rm -fr` (recursive forced deletion)
+- `git reset --hard`, `git reset --merge`
+- `git clean -f`, `git clean -fd`, `git clean -fx`
+- `git push --force`, `git push -f` (use `--force-with-lease` instead)
+- `git branch -D` (force delete)
+- `git stash drop`, `git stash clear`
+- `git checkout --` (file restoration)
+- `find -delete`
+
+**Additional blocks in `paranoid` mode:**
+- `python -c`, `python3 -c`
+- `node -e`, `ruby -e`, `perl -e`
+- `sh -c`, `bash -c`
+
+Based on patterns from [claude-code-safety-net](https://github.com/kenryu42/claude-code-safety-net).
 
 ## Deployment (systemd)
 

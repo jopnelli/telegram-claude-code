@@ -6,7 +6,7 @@ import type { Context } from "grammy";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, getDisallowedTools } from "../config";
 
 /**
  * Minimal environment for Claude CLI subprocess
@@ -76,6 +76,12 @@ export async function handleText(ctx: Context): Promise<void> {
   // Add allowed directories for file access
   for (const allowedPath of ALLOWED_PATHS) {
     args.push("--add-dir", allowedPath);
+  }
+
+  // Add safety restrictions (block dangerous commands)
+  const disallowed = getDisallowedTools();
+  if (disallowed.length > 0) {
+    args.push("--disallowed-tools", disallowed.join(" "));
   }
 
   if (session.sessionId) {
