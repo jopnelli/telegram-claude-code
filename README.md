@@ -8,6 +8,9 @@ Chat with Claude Code from your phone via Telegram. This spawns the actual `clau
 - **Streaming** - See tool calls and responses in real-time
 - **Session persistence** - Conversations continue across messages via `--resume`
 - **Multi-turn** - Full agentic loop within each message
+- **Photos** - Send images for Claude to analyze
+- **Files** - Send documents to Claude (saved to Inbox/)
+- **File sending** - Request files from server via `/send`
 
 ## Quick Start
 
@@ -51,6 +54,7 @@ bun run start
 | `/stop` | Abort query |
 | `/status` | Check state |
 | `/resume` | Resume after restart |
+| `/send <path>` | Send file from server |
 
 Prefix with `!` to interrupt current query.
 
