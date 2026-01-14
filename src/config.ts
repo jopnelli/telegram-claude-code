@@ -15,13 +15,14 @@ export const ALLOWED_USERS: number[] = (process.env.TELEGRAM_ALLOWED_USERS || ""
   .filter((id) => !isNaN(id));
 
 // Paths
-export const WORKING_DIR = process.env.CLAUDE_WORKING_DIR || "/path/to/working/directory";
+const HOME = process.env.HOME || "/tmp";
+export const WORKING_DIR = process.env.CLAUDE_WORKING_DIR || HOME;
 export const SESSION_DIR = process.env.SESSION_DIR || resolve(import.meta.dir, "../../data/sessions");
 export const AUDIT_LOG = process.env.AUDIT_LOG || "/tmp/telegram-claude-code-audit.log";
 
 // Allowed paths for Claude to access
 export const ALLOWED_PATHS: string[] = (
-  process.env.ALLOWED_PATHS || "/path/to/working/directory,/path/to/workspace,/tmp"
+  process.env.ALLOWED_PATHS || `${HOME},/tmp`
 )
   .split(",")
   .map((p) => p.trim());
