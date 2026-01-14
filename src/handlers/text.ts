@@ -50,10 +50,7 @@ export async function handleText(ctx: Context): Promise<void> {
   const streaming = new StreamingState(ctx.api, chatId);
 
   // Send typing indicator periodically (expires after ~5s)
-  const sendTyping = () => {
-    console.log("Sending typing indicator");
-    return ctx.api.sendChatAction(chatId, "typing").catch((e) => console.error("Typing error:", e));
-  };
+  const sendTyping = () => ctx.api.sendChatAction(chatId, "typing").catch(() => {});
   await sendTyping();
   const typingInterval = setInterval(sendTyping, 4000);
 
