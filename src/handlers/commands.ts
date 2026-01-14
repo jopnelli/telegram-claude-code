@@ -27,7 +27,8 @@ export async function handleStart(ctx: Context): Promise<void> {
     "/new - Start fresh session\n" +
     "/stop - Abort current query\n" +
     "/status - Check if processing\n" +
-    "/resume - Resume after restart\n\n" +
+    "/resume - Resume after restart\n" +
+    "/send <path> - Send file from vault\n\n" +
     "Prefix with ! to interrupt."
   );
 }

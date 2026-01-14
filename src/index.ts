@@ -14,6 +14,7 @@ import {
   handleStop,
   handleStatus,
   handleResume,
+  handleSend,
   handleText,
   handlePhoto,
 } from "./handlers";
@@ -48,6 +49,7 @@ bot.command("new", handleNew);
 bot.command("stop", handleStop);
 bot.command("status", handleStatus);
 bot.command("resume", handleResume);
+bot.command("send", handleSend);
 
 // ============== Message Handlers ==============
 
