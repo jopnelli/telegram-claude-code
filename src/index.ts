@@ -17,6 +17,7 @@ import {
   handleSend,
   handleText,
   handlePhoto,
+  handleDocument,
 } from "./handlers";
 
 // Create bot instance
@@ -55,6 +56,7 @@ bot.command("send", handleSend);
 
 bot.on("message:text", handleText);
 bot.on("message:photo", handlePhoto);
+bot.on("message:document", handleDocument);
 
 // ============== Error Handler ==============
 
