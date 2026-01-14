@@ -17,12 +17,12 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   const userId = ctx.from?.id;
   const chatId = ctx.chat?.id;
 
-  if (\!isAuthorized(userId) || \!chatId) {
+  if (!isAuthorized(userId) || !chatId) {
     await ctx.reply("Unauthorized.");
     return;
   }
 
-  const session = getSession(userId\!);
+  const session = getSession(userId!);
 
   if (session.isProcessing) {
     await ctx.reply("Still processing. Use /stop to cancel.");
@@ -30,7 +30,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   }
 
   const photos = ctx.message?.photo;
-  if (\!photos || photos.length === 0) {
+  if (!photos || photos.length === 0) {
     await ctx.reply("No photo found.");
     return;
   }
@@ -39,7 +39,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
   const caption = ctx.message?.caption || "What is in this image?";
 
   auditLog({
-    userId: userId\!,
+    userId: userId!,
     username: ctx.from?.username,
     action: "photo",
     details: caption.slice(0, 100),
@@ -91,11 +91,11 @@ export async function handlePhoto(ctx: Context): Promise<void> {
       jsonBuffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (\!line.trim()) continue;
+        if (!line.trim()) continue;
         try {
           const event = JSON.parse(line);
           
-          if (event.session_id && \!newSessionId) {
+          if (event.session_id && !newSessionId) {
             newSessionId = event.session_id;
           }
 
@@ -133,11 +133,11 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     try { unlinkSync(tempPath); } catch {}
 
     if (newSessionId) {
-      setSessionId(userId\!, newSessionId);
+      setSessionId(userId!, newSessionId);
     }
 
     auditLog({
-      userId: userId\!,
+      userId: userId!,
       action: "response",
       details: `${responseText.length} chars`,
     });
@@ -147,6 +147,6 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     await ctx.reply(`Error: ${err.message}`);
   } finally {
     session.isProcessing = false;
-    persistSession(userId\!, session);
+    persistSession(userId!, session);
   }
 }
