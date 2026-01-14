@@ -49,6 +49,11 @@ export async function handleText(ctx: Context): Promise<void> {
   session.isProcessing = true;
   const streaming = new StreamingState(ctx.api, chatId);
 
+  // Send typing indicator periodically (expires after ~5s)
+  const sendTyping = () => ctx.api.sendChatAction(chatId, "typing").catch(() => {});
+  await sendTyping();
+  const typingInterval = setInterval(sendTyping, 4000);
+
   // Build CLI arguments
   const args = ["-p", text, "--output-format", "stream-json", "--verbose"];
   
@@ -160,6 +165,7 @@ export async function handleText(ctx: Context): Promise<void> {
     await ctx.reply(`Error: ${err.message || "Unknown error"}`);
     auditLog({ userId: userId!, action: "error", details: err.message || "unknown" });
   } finally {
+    clearInterval(typingInterval);
     session.isProcessing = false;
     session.currentMessageId = streaming.getMessageId();
     persistSession(userId!, session);
