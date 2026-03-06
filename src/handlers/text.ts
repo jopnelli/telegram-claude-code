@@ -2,11 +2,72 @@
  * Text message handler - spawns actual Claude Code CLI using Bun subprocess
  */
 
-import type { Context } from "grammy";
+import type { Context, Message } from "grammy";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
 import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, DISALLOWED_TOOLS } from "../config";
+
+/**
+ * Extract forwarded message info from Telegram message
+ * Returns formatted string with sender info and timestamp, or null if not forwarded
+ */
+function getForwardInfo(msg: Message): string | null {
+  // Check for forwarded message (new API: forward_origin, old API: forward_from*)
+  const origin = (msg as any).forward_origin;
+
+  if (origin) {
+    // New Telegram Bot API 7.0+ format
+    const date = origin.date ? new Date(origin.date * 1000).toISOString().slice(0, 16).replace('T', ' ') : '';
+
+    switch (origin.type) {
+      case 'user': {
+        const user = origin.sender_user;
+        const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+        const username = user.username ? ` (@${user.username})` : '';
+        return `[Forwarded from: ${name}${username}, ${date}]`;
+      }
+      case 'chat': {
+        const chat = origin.sender_chat;
+        return `[Forwarded from chat: ${chat.title || chat.username || 'Unknown'}, ${date}]`;
+      }
+      case 'channel': {
+        const channel = origin.chat;
+        return `[Forwarded from channel: ${channel.title || channel.username || 'Unknown'}, ${date}]`;
+      }
+      case 'hidden_user': {
+        return `[Forwarded from: ${origin.sender_user_name || 'Hidden User'}, ${date}]`;
+      }
+      default:
+        return `[Forwarded message, ${date}]`;
+    }
+  }
+
+  // Fallback: Old API format (forward_from, forward_from_chat, etc.)
+  if ((msg as any).forward_from || (msg as any).forward_from_chat || (msg as any).forward_sender_name) {
+    const forwardDate = (msg as any).forward_date
+      ? new Date((msg as any).forward_date * 1000).toISOString().slice(0, 16).replace('T', ' ')
+      : '';
+
+    if ((msg as any).forward_from) {
+      const user = (msg as any).forward_from;
+      const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+      const username = user.username ? ` (@${user.username})` : '';
+      return `[Forwarded from: ${name}${username}, ${forwardDate}]`;
+    }
+
+    if ((msg as any).forward_from_chat) {
+      const chat = (msg as any).forward_from_chat;
+      return `[Forwarded from chat: ${chat.title || chat.username || 'Unknown'}, ${forwardDate}]`;
+    }
+
+    if ((msg as any).forward_sender_name) {
+      return `[Forwarded from: ${(msg as any).forward_sender_name}, ${forwardDate}]`;
+    }
+  }
+
+  return null;
+}
 
 /**
  * Get disallowed tools for CLI flag
@@ -44,6 +105,15 @@ export async function handleText(ctx: Context): Promise<void> {
   }
 
   let text = ctx.message?.text || "";
+
+  // Check for forwarded message and prepend metadata
+  const msg = ctx.message;
+  if (msg) {
+    const forwardInfo = getForwardInfo(msg);
+    if (forwardInfo) {
+      text = `${forwardInfo}\n${text}`;
+    }
+  }
 
   // Handle ! prefix for interrupt
   if (text.startsWith("!")) {
