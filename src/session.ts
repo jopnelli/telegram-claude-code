@@ -34,8 +34,21 @@ export function getSession(userId: number): UserSession {
     };
     
     sessions.set(userId, session);
+  } else if (!session.isProcessing) {
+    // External handoff: the Wiedervorlage routine writes a newer session file
+    // so replies to its ping land in the session that composed it
+    const persisted = loadPersistedSession(userId);
+    if (
+      persisted &&
+      persisted.sessionId !== session.sessionId &&
+      new Date(persisted.lastActivity).getTime() > session.lastActivity.getTime()
+    ) {
+      console.log(`Adopting handed-off session ${persisted.sessionId} for user ${userId}`);
+      session.sessionId = persisted.sessionId;
+      session.lastActivity = new Date(persisted.lastActivity);
+    }
   }
-  
+
   return session;
 }
 
