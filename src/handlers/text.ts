@@ -161,6 +161,14 @@ export async function handleText(ctx: Context): Promise<void> {
     if (!text) return;
   }
 
+  // Wiedervorlage v3: prepend reply context so the session can bind the answer to an item
+  const replyTo = ctx.message?.reply_to_message;
+  if (replyTo && (replyTo.text || replyTo.caption)) {
+    const quotedFull = (replyTo.text || replyTo.caption || "").replace(/\"/g, "'");
+    const quoted = quotedFull.length > 160 ? quotedFull.slice(0, 160) + "…" : quotedFull;
+    text = `[Antwort auf Nachricht ${replyTo.message_id}: "${quoted}"]\n${text}`;
+  }
+
   const session = getSession(userId!);
 
   if (session.isProcessing) {
@@ -190,7 +198,7 @@ export async function handleText(ctx: Context): Promise<void> {
     "  ~/bin/telegram-send-file.sh <filepath> [caption]",
     "This sends the actual file as a document in Telegram. Always use this for sending files.",
     "",
-    "WIEDERVORLAGE PINGS: The daily 'Wiedervorlage <TT.MM.>:' ping is sent by the morning routine, whose session is handed off to this bot afterwards — so if you composed that ping, replies like 'ja <n>', 'verwerfen' or numbered answers refer to YOUR numbered list from the ping. If you did NOT compose today's ping, the numbers refer to that ping's list, never to any list from this conversation — do not answer from memory then. Either way, before executing: cd ~/obsidian && git pull --rebase --autostash, then read the current state: the Wiedervorlage Google Doc via  uv run --python 3.12 --with 'google-auth-oauthlib>=1.2,<2' --with 'google-api-python-client>=2.190,<3' python3 System/Scripts/google_docs.py read 1f_ROCgWRdrUXaxBS8PuepWQkDJ9exMrSc34b1YUyvFI  and today's entry in System/wiedervorlage-log.md. The doc item carries the full execution context (draft path, recipient, command); execute exactly what was approved. If items change as a result, update the doc: write the complete new markdown to /tmp/wiedervorlage-neu.md and run the same script with 'update' and that file instead of 'read'. Commit and push vault changes.",
+    "WIEDERVORLAGE (v3): Daily pings are one header plus one message per decision; the morning routine session is handed off to this bot, so answers normally land in that session. Replies may carry a prefixed line [Antwort auf Nachricht <msg_id>: ...] - resolve the item by matching msg_id against ping.msg_id in System/wiedervorlage/items.json. Without reply context, resolve the item from the wording; if ambiguous, ask back, never guess. Semantics and hard rules: ~/tools/wiedervorlage/CONTRACT.md, section Antworten (ja/nein/text/kontext/spaeter/still/delegier/queue; nothing externally visible without a yes bound to the item; after an external send, send the exact wording as proof). Before executing: cd ~/obsidian && git pull --rebase --autostash. After changes: update System/wiedervorlage/items.json, validate via python3 ~/tools/wiedervorlage/scripts/validate.py --state System/wiedervorlage/items.json, append journal events (python3 ~/tools/wiedervorlage/scripts/journal.py --journal System/wiedervorlage/journal.jsonl add ...), then commit and push. The old Google Doc is retired; never read or write it.",
   ].join("\n");
 
   const args = ["-p", text, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SYSTEM_PROMPT];
