@@ -27,6 +27,15 @@ export const ALLOWED_PATHS: string[] = (process.env.ALLOWED_PATHS || "")
 // Subprocess timeout (default: 5 minutes)
 export const CLAUDE_TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || "300000");
 
+// What this instance is for, as a file appended to the system prompt. Unset keeps
+// the built-in Wiedervorlage context, so a second bot (own token, own service)
+// can be a different assistant without a fork.
+export const INSTANCE_PROMPT_FILE = process.env.INSTANCE_PROMPT_FILE || "";
+
+// Env file the send-file script reads. Passed into the subprocess so a file goes
+// out through this instance's bot, not through another instance's.
+export const BOT_ENV_FILE = process.env.TELEGRAM_BOT_ENV_FILE || "";
+
 /**
  * Dangerous command patterns blocked via --disallowed-tools
  * Based on claude-code-safety-net patterns
@@ -51,6 +60,28 @@ export const DISALLOWED_TOOLS = [
   // Destructive find operations
   "Bash(find*-delete:*)",
 ];
+
+/**
+ * Environment for the Claude CLI subprocess. Deliberately minimal: the bot's own
+ * environment holds the bot token, so nothing is inherited that is not needed.
+ * TELEGRAM_BOT_ENV_FILE is a path, not a secret, and only travels so that
+ * telegram-send-file.sh answers through this instance's bot.
+ */
+export function claudeEnv(): Record<string, string> {
+  const env: Record<string, string> = {
+    PATH: process.env.PATH || "/usr/bin:/bin:/usr/local/bin",
+    HOME: process.env.HOME || "",
+    USER: process.env.USER || "",
+    SHELL: process.env.SHELL || "/bin/sh",
+    TERM: "dumb",
+    FORCE_COLOR: "0",
+    // Claude CLI uses its own OAuth, not API keys
+  };
+
+  if (BOT_ENV_FILE) env.TELEGRAM_BOT_ENV_FILE = BOT_ENV_FILE;
+
+  return env;
+}
 
 // Telegram limits
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
@@ -78,3 +109,4 @@ console.log(`  Allowed users: ${ALLOWED_USERS.length}`);
 console.log(`  Allowed paths: ${ALLOWED_PATHS.length}`);
 console.log(`  Timeout: ${CLAUDE_TIMEOUT_MS}ms`);
 console.log(`  Blocked patterns: ${DISALLOWED_TOOLS.length}`);
+console.log(`  Instance prompt: ${INSTANCE_PROMPT_FILE || "built-in (Wiedervorlage)"}`);

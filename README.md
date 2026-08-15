@@ -63,7 +63,31 @@ install -m 755 bin/telegram-send-file.sh ~/bin/telegram-send-file.sh
 ```
 
 Es liest Token und Chat-ID aus `~/tools/telegram-claude-code/.env`. Liegt das
-Repo woanders, `TELEGRAM_BOT_ENV_FILE` auf die eigene `.env` setzen.
+Repo woanders, `TELEGRAM_BOT_ENV_FILE` auf die eigene `.env` setzen; die Bridge
+reicht den Pfad an die Session durch.
+
+## Mehrere Instanzen
+
+Eine zweite Bridge ist eine zweite `.env` plus ein zweiter Service, kein Fork.
+Was die Instanz sein soll, steht in einer Datei:
+
+```bash
+INSTANCE_PROMPT_FILE=/pfad/zum/auftrag.md
+```
+
+Der Inhalt haengt sich an den System-Prompt und wird pro Nachricht neu gelesen,
+laesst sich also ohne Neustart aendern. Ohne den Wert gilt der eingebaute
+Wiedervorlage-Kontext, bestehende Instanzen aendern sich also nicht.
+
+Was pro Instanz auseinandergehen muss, sonst greifen zwei Bots in dieselbe
+Ablage:
+
+| Variable | Warum |
+|----------|-------|
+| `TELEGRAM_BOT_TOKEN` | eigener Bot |
+| `SESSION_DIR` | sonst adoptiert die eine Instanz den Gespraechsfaden der anderen |
+| `AUDIT_LOG` | sonst mischen sich die Protokolle |
+| `TELEGRAM_BOT_ENV_FILE` | sonst geht `/send` ueber den falschen Bot raus |
 
 ## Betrieb
 
@@ -183,8 +207,9 @@ Reply zurueck und werden ueber `ping.msg_ref` in
 harte Regeln stehen im Kit unter `jpusinelli/wiedervorlage`
 (`CONTRACT.md`, Abschnitt Antworten).
 
-Wer die Bridge ohne Wiedervorlage betreibt, laesst den Block einfach stehen: er
-greift nur, wenn es die Dateien gibt. Wer sie nutzt, braucht das Kit unter
+Wer die Bridge ohne Wiedervorlage betreibt, setzt `INSTANCE_PROMPT_FILE` und ist
+den Block los; stehen lassen geht auch, er greift nur, wenn es die Dateien gibt.
+Wer sie nutzt, braucht das Kit unter
 `~/tools/wiedervorlage` und den Vault unter `~/obsidian`, denn beide Pfade sind
 im Prompt als Konvention verdrahtet.
 

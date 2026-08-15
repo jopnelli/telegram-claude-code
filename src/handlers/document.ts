@@ -10,7 +10,7 @@ import { join } from "path";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR } from "../config";
+import { WORKING_DIR, claudeEnv } from "../config";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB Telegram bot download limit
 
@@ -89,7 +89,7 @@ export async function handleDocument(ctx: Context): Promise<void> {
 
     const proc = Bun.spawn(["claude", ...args], {
       cwd: WORKING_DIR,
-      env: { ...process.env, FORCE_COLOR: "0" },
+      env: claudeEnv(),
       stdout: "pipe",
       stderr: "pipe",
     });

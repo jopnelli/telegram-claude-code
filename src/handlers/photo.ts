@@ -12,27 +12,13 @@ import { randomUUID } from "crypto";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN, DISALLOWED_TOOLS } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN, DISALLOWED_TOOLS, claudeEnv } from "../config";
 
 /**
  * Get disallowed tools for CLI flag
  */
 function getDisallowedTools(): string[] {
   return DISALLOWED_TOOLS;
-}
-
-/**
- * Minimal environment for Claude CLI subprocess
- */
-function getClaudeEnv(): Record<string, string> {
-  return {
-    PATH: process.env.PATH || "/usr/bin:/bin:/usr/local/bin",
-    HOME: process.env.HOME || "",
-    USER: process.env.USER || "",
-    SHELL: process.env.SHELL || "/bin/sh",
-    TERM: "dumb",
-    FORCE_COLOR: "0",
-  };
 }
 
 export async function handlePhoto(ctx: Context): Promise<void> {
@@ -110,7 +96,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
 
     const proc = Bun.spawn(["claude", ...args], {
       cwd: WORKING_DIR,
-      env: getClaudeEnv(),
+      env: claudeEnv(),
       stdout: "pipe",
       stderr: "pipe",
     });

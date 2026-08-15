@@ -2,11 +2,19 @@
  * Text message handler - spawns actual Claude Code CLI using Bun subprocess
  */
 
+import { readFileSync } from "fs";
 import type { Context } from "grammy";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, clearSession, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, DISALLOWED_TOOLS } from "../config";
+import {
+  WORKING_DIR,
+  ALLOWED_PATHS,
+  CLAUDE_TIMEOUT_MS,
+  DISALLOWED_TOOLS,
+  INSTANCE_PROMPT_FILE,
+  claudeEnv,
+} from "../config";
 
 /**
  * Get disallowed tools for CLI flag
@@ -16,19 +24,31 @@ function getDisallowedTools(): string[] {
 }
 
 /**
- * Minimal environment for Claude CLI subprocess
- * Only includes what's necessary - no API keys or sensitive data
+ * How the bridge itself behaves, regardless of what the instance is for.
  */
-function getClaudeEnv(): Record<string, string> {
-  return {
-    PATH: process.env.PATH || "/usr/bin:/bin:/usr/local/bin",
-    HOME: process.env.HOME || "",
-    USER: process.env.USER || "",
-    SHELL: process.env.SHELL || "/bin/sh",
-    TERM: "dumb",
-    FORCE_COLOR: "0",
-    // Claude CLI uses its own OAuth, not API keys
-  };
+const BRIDGE_PROMPT = [
+  "You are responding via Telegram. Do NOT use Markdown formatting (no **, no ## headers, no `backticks`, no [links](url)). Use plain text only. Use line breaks and emoji for structure instead.",
+  "IMPORTANT: When the user asks you to send a file, do NOT paste the file contents. Instead, use the send-file script to deliver it as a Telegram file attachment:",
+  "  ~/bin/telegram-send-file.sh <filepath> [caption]",
+  "This sends the actual file as a document in Telegram. Always use this for sending files.",
+].join("\n");
+
+const WIEDERVORLAGE_PROMPT =
+  "WIEDERVORLAGE (v3): Daily pings are one header plus one message per decision; the morning routine session is handed off to this bot, so answers normally land in that session. Replies may carry a prefixed line [Antwort auf Nachricht <msg_id>: ...] - resolve the item by matching msg_id against ping.msg_ref in System/wiedervorlage/items.json. Without reply context, resolve the item from the wording; if ambiguous, ask back, never guess. Semantics and hard rules: ~/tools/wiedervorlage/CONTRACT.md, section Antworten (ja/nein/text/kontext/spaeter/still/delegier/queue; nothing externally visible without a yes bound to the item; after an external send, send the exact wording as proof). Before executing: cd ~/obsidian && git pull --rebase --autostash. After changes: update System/wiedervorlage/items.json, validate via python3 ~/tools/wiedervorlage/scripts/validate.py --state System/wiedervorlage/items.json, append journal events (python3 ~/tools/wiedervorlage/scripts/journal.py --journal System/wiedervorlage/journal.jsonl add ...), then commit and push. The old Google Doc is retired; never read or write it.";
+
+/**
+ * What this instance is for. Read per message, so the file can be edited without
+ * restarting the service.
+ */
+function instancePrompt(): string {
+  if (!INSTANCE_PROMPT_FILE) return WIEDERVORLAGE_PROMPT;
+
+  try {
+    return readFileSync(INSTANCE_PROMPT_FILE, "utf-8").trim();
+  } catch (err) {
+    console.error(`Instance prompt unreadable (${INSTANCE_PROMPT_FILE}):`, err);
+    return "";
+  }
 }
 
 /**
@@ -43,7 +63,7 @@ async function runClaude(
 
   const proc = Bun.spawn(["claude", ...args], {
     cwd: WORKING_DIR,
-    env: getClaudeEnv(),
+    env: claudeEnv(),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -161,7 +181,7 @@ export async function handleText(ctx: Context): Promise<void> {
     if (!text) return;
   }
 
-  // Wiedervorlage v3: prepend reply context so the session can bind the answer to an item
+  // Prepend reply context so the session can bind the answer to what it asked
   const replyTo = ctx.message?.reply_to_message;
   if (replyTo && (replyTo.text || replyTo.caption)) {
     const quotedFull = (replyTo.text || replyTo.caption || "").replace(/\"/g, "'");
@@ -192,14 +212,7 @@ export async function handleText(ctx: Context): Promise<void> {
   const typingInterval = setInterval(sendTyping, 4000);
 
   // Build CLI arguments
-  const SYSTEM_PROMPT = [
-    "You are responding via Telegram. Do NOT use Markdown formatting (no **, no ## headers, no `backticks`, no [links](url)). Use plain text only. Use line breaks and emoji for structure instead.",
-    "IMPORTANT: When the user asks you to send a file, do NOT paste the file contents. Instead, use the send-file script to deliver it as a Telegram file attachment:",
-    "  ~/bin/telegram-send-file.sh <filepath> [caption]",
-    "This sends the actual file as a document in Telegram. Always use this for sending files.",
-    "",
-    "WIEDERVORLAGE (v3): Daily pings are one header plus one message per decision; the morning routine session is handed off to this bot, so answers normally land in that session. Replies may carry a prefixed line [Antwort auf Nachricht <msg_id>: ...] - resolve the item by matching msg_id against ping.msg_ref in System/wiedervorlage/items.json. Without reply context, resolve the item from the wording; if ambiguous, ask back, never guess. Semantics and hard rules: ~/tools/wiedervorlage/CONTRACT.md, section Antworten (ja/nein/text/kontext/spaeter/still/delegier/queue; nothing externally visible without a yes bound to the item; after an external send, send the exact wording as proof). Before executing: cd ~/obsidian && git pull --rebase --autostash. After changes: update System/wiedervorlage/items.json, validate via python3 ~/tools/wiedervorlage/scripts/validate.py --state System/wiedervorlage/items.json, append journal events (python3 ~/tools/wiedervorlage/scripts/journal.py --journal System/wiedervorlage/journal.jsonl add ...), then commit and push. The old Google Doc is retired; never read or write it.",
-  ].join("\n");
+  const SYSTEM_PROMPT = [BRIDGE_PROMPT, "", instancePrompt()].join("\n");
 
   const args = ["-p", text, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SYSTEM_PROMPT];
 
