@@ -1,13 +1,16 @@
 # Dependencies
 node_modules/
 
-# Environment
+# Environment (never commit real tokens)
 .env
+.env.*
+!.env.example
 
-# Sessions
-data/sessions/*.json
+# Runtime state: session handoff files, downloaded media
+data/
+sessions/
 
-# Logs
+# Logs (audit log included)
 *.log
 
 # OS

@@ -5,7 +5,7 @@
  */
 
 import type { Context } from "grammy";
-import { writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
@@ -68,7 +68,9 @@ export async function handleDocument(ctx: Context): Promise<void> {
     const buffer = await response.arrayBuffer();
 
     // Save to working directory (user can keep it)
-    const savePath = join(WORKING_DIR, "Inbox", fileName);
+    const inboxDir = join(WORKING_DIR, "Inbox");
+    mkdirSync(inboxDir, { recursive: true });
+    const savePath = join(inboxDir, fileName);
     writeFileSync(savePath, Buffer.from(buffer));
 
     // Build prompt

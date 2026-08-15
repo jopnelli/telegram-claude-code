@@ -21,14 +21,14 @@ export async function handleStart(ctx: Context): Promise<void> {
 
   await ctx.reply(
     "Claude Code Bot ready.\n\n" +
-    "Send me messages to chat with Claude Opus 4.5.\n" +
+    "Send me messages to chat with Claude Code.\n" +
     "Your conversation persists across messages.\n\n" +
     "Commands:\n" +
     "/new - Start fresh session\n" +
     "/stop - Abort current query\n" +
     "/status - Check if processing\n" +
     "/resume - Resume after restart\n" +
-    "/send <path> - Send file from vault\n\n" +
+    "/send <path> - Send file from working dir\n\n" +
     "Prefix with ! to interrupt."
   );
 }

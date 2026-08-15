@@ -23,6 +23,7 @@ Telegram message
 | `src/streaming.ts` | Throttled Telegram message updates |
 | `src/security.ts` | User allowlist, audit logging |
 | `src/config.ts` | Environment variables |
+| `bin/telegram-send-file.sh` | Installed to `~/bin`, sends files as attachments |
 
 ## CLI Integration
 
@@ -42,6 +43,9 @@ The `stream-json` output provides events:
 - Session IDs stored in `data/sessions/{userId}.json`
 - `--resume` flag continues conversation
 - `/new` clears session for fresh start
+- External handoff: a newer `lastActivity` in the file wins over the in-memory
+  session, so another process can hand its session to the bot. `workingDir`
+  must match `CLAUDE_WORKING_DIR` or the file is ignored.
 
 ## Streaming
 
