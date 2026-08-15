@@ -40,12 +40,23 @@ The `stream-json` output provides events:
 
 ## Session Management
 
-- Session IDs stored in `data/sessions/{userId}.json`
+- Session IDs stored in `<SESSION_DIR>/{userId}.json`, default `../data/sessions`
+  relative to the repo root
 - `--resume` flag continues conversation
 - `/new` clears session for fresh start
 - External handoff: a newer `lastActivity` in the file wins over the in-memory
   session, so another process can hand its session to the bot. `workingDir`
   must match `CLAUDE_WORKING_DIR` or the file is ignored.
+
+## Instances
+
+A second bot is a second `.env` plus a second service, not a fork.
+`INSTANCE_PROMPT_FILE` points at a file appended to the system prompt, re-read
+per message in `instancePrompt()` (`src/handlers/text.ts`); unset keeps the
+built-in Wiedervorlage context in the same file. Per instance also
+`TELEGRAM_BOT_TOKEN`, `SESSION_DIR` and `AUDIT_LOG`, all read in `src/config.ts`,
+plus `TELEGRAM_BOT_ENV_FILE`, the only one of them handed to the subprocess in
+`claudeEnv()` so `/send` answers through this instance's bot.
 
 ## Streaming
 

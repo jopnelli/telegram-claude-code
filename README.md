@@ -149,7 +149,9 @@ Antwort geloescht, Dokumente unter `<CLAUDE_WORKING_DIR>/Inbox/`.
 ## Session-Handoff
 
 Pro User liegt eine Datei unter `<SESSION_DIR>/<user-id>.json`, per Default
-`data/sessions/<user-id>.json`:
+unter `data/sessions` neben dem Repo, nicht darin. Zwei Checkouts im selben
+Ordner teilen sich also dieselbe Ablage, solange `SESSION_DIR` nicht gesetzt
+ist. Inhalt:
 
 ```json
 {
@@ -168,7 +170,9 @@ Session weiter.
 
 `workingDir` ist die Sicherung dabei: stimmt der Wert nicht mit
 `CLAUDE_WORKING_DIR` ueberein, wird die Datei ignoriert. Sessions aus einem
-anderen Arbeitsverzeichnis werden also nicht versehentlich adoptiert.
+anderen Arbeitsverzeichnis werden also nicht versehentlich adoptiert. Zwischen
+zwei Instanzen mit demselben `CLAUDE_WORKING_DIR` greift die Sicherung nicht,
+dort trennt allein `SESSION_DIR`.
 
 ## Sicherheitsmodell
 
