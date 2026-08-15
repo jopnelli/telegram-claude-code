@@ -32,8 +32,8 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-BOT_TOKEN=$(grep TELEGRAM_BOT_TOKEN "$ENV_FILE" | cut -d= -f2-)
-CHAT_ID=$(grep TELEGRAM_ALLOWED_USERS "$ENV_FILE" | cut -d= -f2- | cut -d, -f1)
+BOT_TOKEN=$(grep -m1 "^TELEGRAM_BOT_TOKEN=" "$ENV_FILE" | cut -d= -f2-)
+CHAT_ID=$(grep -m1 "^TELEGRAM_ALLOWED_USERS=" "$ENV_FILE" | cut -d= -f2- | cut -d, -f1)
 
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
     echo "[ERROR] BOT_TOKEN or CHAT_ID not found in $ENV_FILE"
