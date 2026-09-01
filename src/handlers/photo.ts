@@ -43,7 +43,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     return;
   }
 
-  const photo = photos[photos.length - 1];
+  const photo = photos[photos.length - 1]!;
   const caption = ctx.message?.caption || "What is in this image?";
 
   auditLog({
