@@ -34,6 +34,15 @@ export async function handleStart(ctx: Context): Promise<void> {
 }
 
 /**
+ * The reset behind /new: drop the session so the next message opens a fresh one.
+ * Shared with the automatic rotation, so both paths clear the same state.
+ */
+export function resetSession(userId: number, details: string): void {
+  clearSession(userId);
+  auditLog({ userId, action: "new_session", details });
+}
+
+/**
  * /new - Start a fresh session
  */
 export async function handleNew(ctx: Context): Promise<void> {
@@ -44,8 +53,7 @@ export async function handleNew(ctx: Context): Promise<void> {
     return;
   }
 
-  clearSession(userId!);
-  auditLog({ userId: userId!, action: "new_session", details: "Cleared session" });
+  resetSession(userId!, "Cleared session");
 
   await ctx.reply("Started a new session. Previous context cleared.");
 }

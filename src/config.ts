@@ -27,6 +27,12 @@ export const ALLOWED_PATHS: string[] = (process.env.ALLOWED_PATHS || "")
 // Subprocess timeout (default: 5 minutes)
 export const CLAUDE_TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || "300000");
 
+// When a session is rotated automatically (src/rotation.ts): a transcript this
+// large costs a full re-read of the history on every message, and a session
+// picked up days later carries context nobody means anymore.
+export const MAX_TRANSCRIPT_BYTES = 200_000;
+export const MAX_SESSION_IDLE_MS = 3 * 24 * 60 * 60 * 1000;
+
 // What this instance is for, as a file appended to the system prompt. Unset keeps
 // the built-in Wiedervorlage context, so a second bot (own token, own service)
 // can be a different assistant without a fork.

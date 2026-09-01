@@ -20,6 +20,7 @@ Telegram message
 | `src/handlers/text.ts` | Main handler - spawns Claude CLI |
 | `src/handlers/commands.ts` | /new, /stop, /status, /resume |
 | `src/session.ts` | Session ID persistence |
+| `src/rotation.ts` | Middleware, auto-rotates a stale or oversized session |
 | `src/streaming.ts` | Throttled Telegram message updates |
 | `src/security.ts` | User allowlist, audit logging |
 | `src/config.ts` | Environment variables |
@@ -44,6 +45,12 @@ The `stream-json` output provides events:
   relative to the repo root
 - `--resume` flag continues conversation
 - `/new` clears session for fresh start
+- Auto-rotation (`src/rotation.ts`): before a non-command message is handled,
+  a session whose transcript passed `MAX_TRANSCRIPT_BYTES` or that sat idle
+  longer than `MAX_SESSION_IDLE_MS` is reset through the same `resetSession()`
+  as `/new`, with a one-line notice to the user. The transcript is read at
+  `~/.claude/projects/<CLAUDE_WORKING_DIR with "/" as "-">/<sessionId>.jsonl`.
+  A check that throws is logged and ignored, the message is still handled.
 - External handoff: a newer `lastActivity` in the file wins over the in-memory
   session, so another process can hand its session to the bot. `workingDir`
   must match `CLAUDE_WORKING_DIR` or the file is ignored.

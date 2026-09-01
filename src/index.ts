@@ -19,6 +19,7 @@ import {
   handlePhoto,
   handleDocument,
 } from "./handlers";
+import { rotationGuard } from "./rotation";
 
 // Create bot instance
 const bot = new Bot(TELEGRAM_TOKEN);
@@ -42,6 +43,10 @@ bot.use(
     return ctx.from?.id.toString();
   })
 );
+
+// Rotate an oversized or long-idle session before the message is handled.
+// Behind sequentialize, so the check runs once per message, not concurrently.
+bot.use(rotationGuard);
 
 // ============== Command Handlers ==============
 
