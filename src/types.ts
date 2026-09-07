@@ -11,6 +11,8 @@ export interface UserSession {
   abortController: AbortController | null;
   currentMessageId: number | null;
   lastActivity: Date;
+  /** Context from a rotated-away session, prepended to the next prompt */
+  pendingHandover: string | null;
 }
 
 // Persisted session data (saved to disk)

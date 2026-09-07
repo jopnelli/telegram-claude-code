@@ -31,6 +31,7 @@ export function getSession(userId: number): UserSession {
       abortController: null,
       currentMessageId: null,
       lastActivity: persisted ? new Date(persisted.lastActivity) : new Date(),
+      pendingHandover: null,
     };
     
     sessions.set(userId, session);

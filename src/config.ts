@@ -29,9 +29,17 @@ export const CLAUDE_TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || "3000
 
 // When a session is rotated automatically (src/rotation.ts): a transcript this
 // large costs a full re-read of the history on every message, and a session
-// picked up days later carries context nobody means anymore.
-export const MAX_TRANSCRIPT_BYTES = 200_000;
+// picked up days later carries context nobody means anymore. One normal chat
+// day writes about 200KB (session start alone reads several vault files into
+// the transcript), so the soft limit holds a few days of conversation.
+export const MAX_TRANSCRIPT_BYTES = 600_000;
 export const MAX_SESSION_IDLE_MS = 3 * 24 * 60 * 60 * 1000;
+
+// Rotation must not land mid-conversation: past the soft limit it waits until
+// the incoming message follows this much quiet. The hard ceiling rotates
+// regardless, so one endless conversation cannot grow the transcript forever.
+export const MIN_ROTATION_QUIET_MS = 60 * 60 * 1000;
+export const HARD_MAX_TRANSCRIPT_BYTES = 1_500_000;
 
 // What this instance is for, as a file appended to the system prompt. Unset keeps
 // the built-in Wiedervorlage context, so a second bot (own token, own service)

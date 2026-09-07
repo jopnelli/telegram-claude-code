@@ -211,10 +211,18 @@ export async function handleText(ctx: Context): Promise<void> {
   await sendTyping();
   const typingInterval = setInterval(sendTyping, 4000);
 
+  // A rotation left the old session's tail behind: prepend it once, so the
+  // fresh session knows what was just being discussed
+  let prompt = text;
+  if (session.pendingHandover) {
+    prompt = `${session.pendingHandover}\n\n${text}`;
+    session.pendingHandover = null;
+  }
+
   // Build CLI arguments
   const SYSTEM_PROMPT = [BRIDGE_PROMPT, "", instancePrompt()].join("\n");
 
-  const args = ["-p", text, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SYSTEM_PROMPT];
+  const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SYSTEM_PROMPT];
 
   // Add allowed directories for file access
   for (const allowedPath of ALLOWED_PATHS) {
