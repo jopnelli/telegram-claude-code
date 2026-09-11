@@ -13,6 +13,7 @@ import {
   CLAUDE_TIMEOUT_MS,
   DISALLOWED_TOOLS,
   INSTANCE_PROMPT_FILE,
+  STYLE_PROMPT,
   claudeEnv,
 } from "../config";
 
@@ -220,7 +221,7 @@ export async function handleText(ctx: Context): Promise<void> {
   }
 
   // Build CLI arguments
-  const SYSTEM_PROMPT = [BRIDGE_PROMPT, "", instancePrompt()].join("\n");
+  const SYSTEM_PROMPT = [BRIDGE_PROMPT, "", instancePrompt(), "", STYLE_PROMPT].join("\n");
 
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SYSTEM_PROMPT];
 

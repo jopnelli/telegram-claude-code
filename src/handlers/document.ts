@@ -10,7 +10,7 @@ import { join } from "path";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, claudeEnv } from "../config";
+import { WORKING_DIR, STYLE_PROMPT, claudeEnv } from "../config";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB Telegram bot download limit
 
@@ -76,7 +76,7 @@ export async function handleDocument(ctx: Context): Promise<void> {
     // Build prompt
     const prompt = `I saved a file you sent to ${savePath}. ${caption}`;
 
-    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose"];
+    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", STYLE_PROMPT];
     if (session.sessionId) {
       args.push("--resume", session.sessionId);
     }

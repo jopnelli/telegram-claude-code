@@ -46,6 +46,11 @@ export const HARD_MAX_TRANSCRIPT_BYTES = 1_500_000;
 // can be a different assistant without a fork.
 export const INSTANCE_PROMPT_FILE = process.env.INSTANCE_PROMPT_FILE || "";
 
+// Reply style, appended to the system prompt of every Claude invocation
+// (text, photo, document) so answers sound the same regardless of handler.
+export const STYLE_PROMPT =
+  "Antworte auf Telegram knapp und pragmatisch: erst die Antwort, dann hoechstens ein, zwei Saetze Begruendung. Wenige kurze Zeilen, keine Ueberschriften, keine Aufzaehlungen ausser im Session-Template aus dem Training-CLAUDE.md. Nichts wiederholen, was er geschrieben hat, keine Absicherungsfloskeln, keine Zusammenfassung am Ende. Informativ bleiben: Zahlen, Dosen, Uhrzeiten und Entscheidungen vollstaendig, nur das Drumherum weglassen. Keine Gedankenstriche.";
+
 // Env file the send-file script reads. Passed into the subprocess so a file goes
 // out through this instance's bot, not through another instance's.
 export const BOT_ENV_FILE = process.env.TELEGRAM_BOT_ENV_FILE || "";

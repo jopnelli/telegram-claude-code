@@ -33,6 +33,12 @@ Each message runs:
 claude -p "message" --output-format stream-json --verbose --resume <session_id>
 ```
 
+Every invocation gets `STYLE_PROMPT` (`src/config.ts`) appended to the system
+prompt: a fixed German instruction for terse, pragmatic Telegram replies. The
+text handler folds it into its composed `--append-system-prompt` value (after
+bridge and instance prompt); the photo and document handlers pass it as their
+own `--append-system-prompt` argument.
+
 The `stream-json` output provides events:
 - `system` - Session init with session_id
 - `assistant` - Text and tool_use blocks

@@ -12,7 +12,7 @@ import { randomUUID } from "crypto";
 import { isAuthorized, auditLog } from "../security";
 import { getSession, setSessionId, persistSession } from "../session";
 import { StreamingState } from "../streaming";
-import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN, DISALLOWED_TOOLS, claudeEnv } from "../config";
+import { WORKING_DIR, ALLOWED_PATHS, CLAUDE_TIMEOUT_MS, TELEGRAM_TOKEN, DISALLOWED_TOOLS, STYLE_PROMPT, claudeEnv } from "../config";
 
 /**
  * Get disallowed tools for CLI flag
@@ -73,7 +73,7 @@ export async function handlePhoto(ctx: Context): Promise<void> {
     // Build prompt that references the image
     const prompt = `I have saved an image to ${tempPath}. Please look at it and answer: ${caption}`;
 
-    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose"];
+    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", STYLE_PROMPT];
 
     // Add allowed directories for file access
     for (const allowedPath of ALLOWED_PATHS) {
